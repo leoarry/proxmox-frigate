@@ -1,0 +1,6 @@
+frigate_version = "stable"
+image_name = "FrigateProxmoxLxc"
+image_output_path= "/mnt/storage/template/cache"
+ssh_username = "root"
+ssh_password = "ChangeMe"
+remote_host = "127.0.0.1"

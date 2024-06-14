@@ -1,0 +1,61 @@
+#!/bin/sh -e
+
+# This is the first program launched at container start.
+# We don't know where our binaries are and we cannot guarantee
+# that the default PATH can access them.
+# So this script needs to be entirely self-contained until it has
+# at least /command, /usr/bin and /bin in its PATH.
+/sbin/ip link set dev eth0 up
+/sbin/ip link set dev lo up
+ifup -a --force
+
+export S6_LOGGING_SCRIPT="T 1 n0 s10000000 T"
+export S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+#export CCACHE_DIR=/root/.ccache
+#export CCACHE_MAXSIZE=2G
+
+mkdir -p /tmp/cache
+chmod 777 /tmp/cache
+mount -t tmpfs -o size=1024m tmpcache /tmp/cache
+
+rm -rf /dev/shm
+mkdir -p /dev/shm/logs/frigate/
+chmod -R 777 /dev/shm/
+mount -t tmpfs -o size=1024m devshm /dev/shm
+
+addpath () {
+  x="$1"
+  IFS=:
+  set -- $PATH
+  IFS=
+  while test "$#" -gt 0 ; do
+    if test "$1" = "$x" ; then
+      return
+    fi
+    shift
+  done
+  PATH="${x}:$PATH"
+}
+
+if test -z "$PATH" ; then
+  PATH=/bin
+fi
+
+addpath /bin
+addpath /usr/bin
+addpath /command
+addpath /usr/lib/btbn-ffmpeg/bin
+addpath /usr/local/go2rtc/bin
+addpath /usr/local/nginx/sbin
+export PATH
+
+# Now we're good: s6-overlay-suexec is accessible via PATH, as are
+# all our binaries.
+# Run preinit as root, then run stage0 as the container's user (can be
+# root, can be a normal user).
+
+exec s6-overlay-suexec \
+  ' /package/admin/s6-overlay-3.1.5.0/libexec/preinit' \
+  '' \
+  /package/admin/s6-overlay-3.1.5.0/libexec/stage0 \
+  "$@"
